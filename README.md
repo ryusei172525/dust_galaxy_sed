@@ -34,10 +34,10 @@ galaxy_sed/
 1. Build the C++ components:
 
    ```bash
-   mkdir galaxy_sed/bindings/build
-   cd galaxy_sed/bindings/build
-   cmake ..
-   make
+   rm -r galaxy_sed/Dust_cpp_pybind/build
+   mkdir galaxy_sed/Dust_cpp_pybind/build
+   cmake -S galaxy_sed/Dust_cpp_pybind -B galaxy_sed/Dust_cpp_pybind/build
+   make -C galaxy_sed/Dust_cpp_pybind/build
    ```
 
 2. If the `make` command completes successfully, the library is ready to use, and you can run the `example.ipynb` file to see the functionality.
