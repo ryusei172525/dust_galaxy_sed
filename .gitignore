@@ -8,3 +8,5 @@ galaxy_sed/Dust_cpp_pybind/calculation_result/dust_model/asano_model
 galaxy_sed/Dust_cpp_pybind/calculation_result/dust_model/averaged_dust_property
 galaxy_sed/Dust_cpp_pybind/calculation_result/makeSED
 galaxy_sed/Dust_cpp_pybind/calculation_result/stellar_spectrum
+
+galaxy_sed/Dust_cpp_pybind/data
