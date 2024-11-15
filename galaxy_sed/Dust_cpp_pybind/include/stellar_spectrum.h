@@ -29,7 +29,7 @@ class StellarSpectrum {
     static constexpr auto N_MAX_TIME_SSP = std::size_t(600);
     static constexpr auto n_lambda_      = std::size_t(1221);
 
-    const std::vector<std::string> fn_track_vec_ = ReadSSPZFileName(); // track の名前が書いてあるファイルからその名前を読み込む
+    const std::vector<std::string> fn_track_vec_ = ReadSSPZFileName(); // track の名前が書いてあるファイルからその名前を読み込む 例. Chabrier_SSPs.dat, Chabrier_x=0.5_SSPs.datなど
     // file 名から金属量を読み取る
     const std::vector<double>      Z_SSP_vec_    = ReadMetallicityVector(fn_track_vec_);
     const std::size_t              n_Z_          = fn_track_vec_.size(); // The number of metallicity

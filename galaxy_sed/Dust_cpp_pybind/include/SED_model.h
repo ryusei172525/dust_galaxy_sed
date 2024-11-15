@@ -37,7 +37,7 @@ inline void AgeDependent(const std::vector<std::string>& dust_species_vec, doubl
                          std::vector<my_util::dust_util::Dust>& dust_vec,
                          FreeParameter& free_params,
                          const std::vector<std::pair<double, double>>& geometry_pair_vec,
-                         const val& L_star_val, const val& f_young_val, const val& Cabs_sum_val) {
+                         const val& L_star_val, const val& f_young_val, const val& Cabs_sum_val, double n0_cnm) {
 
     // first: h_dust, second: R_gal
     for (const auto& geometry_pair : geometry_pair_vec) {
@@ -48,7 +48,7 @@ inline void AgeDependent(const std::vector<std::string>& dust_species_vec, doubl
         const auto ai = free_params.ai_;
 
         auto RT = radiative_transfer::RadiativeTransfer(D, free_params.dz_, f_young_val,
-                                                        k_val, omega_val, g_val);
+                                                        k_val, omega_val, g_val, n0_cnm);
 
         // RT.WriteMGAParameter(free_params);
         const auto transmission_rate_val2 = RT.Calculate(free_params);

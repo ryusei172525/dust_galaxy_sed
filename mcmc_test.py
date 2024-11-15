@@ -1,3 +1,5 @@
+# MCMCの動作テスト用
+
 import nest_asyncio
 
 import sys
@@ -30,7 +32,7 @@ param_limits = {
 }
 
 async def main():
-    # delete_past_data()
+    delete_past_data()
     # ハイパーパラメータを取得
     hyperparams = get_hyperparams(galaxy_age=galaxy_age, galaxy_mass=galaxy_mass, starformation_timescale=starformation_timescale_Gyr)  # galaxy_age のみを指定
     observational_data = 'observation/MACS0416Y1.dat'
@@ -38,6 +40,7 @@ async def main():
     result = await MCMCOptimizer.run_mcmc(hyperparams, observational_data, n_walkers, n_dimensions, param_limits)  # 辞書を渡す
 
     print("計算終了")
+    delete_past_data()
 
 # イベントループを実行
 if __name__ == "__main__":

@@ -57,12 +57,13 @@ class AsanoModel {
     inline void Calculate(const FreeParameter& free_params,
                           const std::string& ofn_total_dust_mass,
                           const std::string& ofn_dust_mass_distribution,
-                          const std::string& ofn_dust_number_distribution) const {
+                          const std::string& ofn_dust_number_distribution,
+                          const int imf_type) const {
         const auto n_age = static_cast<size_t>(free_params.age_max_ / TIME_BIN_DUST_MODEL) + 1;
 
         const auto calc_start = std::chrono::system_clock::now();
 
-        const auto IMF_val = SFH::NormalizedIMF();
+        const auto IMF_val = SFH::NormalizedIMF(imf_type);
 
         auto M_gas_val = val(n_age);
         if (free_params.is_infall_) M_gas_val[0] = DBL_MIN; // If the initial mass is 0, it will be troublesome. Set it to 1.
@@ -74,8 +75,7 @@ class AsanoModel {
         auto M_C_ISM_val   = val(n_age); // Carbon mass in ISM (including non dust)
         auto M_sil_ISM_val = val(n_age); // Silicate mass in ISM (including non dust)
         auto SNR_val       = val(n_age); // Supernova rate
-        auto Y_d_val3      = val3(val2(val(N_MAX_DUST_RADIUS), N_DUST_SPECIES),
-                                  n_age); // Dust yield by stars
+        auto Y_d_val3      = val3(val2(val(N_MAX_DUST_RADIUS), N_DUST_SPECIES), n_age); // Dust yield by stars
 
         for (auto i_age = std::size_t(0); i_age < n_age - 1; ++i_age) {
             const auto i_m_min      = MinimumStellarMassIndex(i_age, tau_star_val_);
@@ -97,6 +97,7 @@ class AsanoModel {
             // Equ. (4.10) of Nishida D-thesis
             Y_d_val3[i_age + 1] = DustYield(i_m_min, i_birth_valt, M_gas_val, M_Z_val, IMF_val,
                                             SFR_val, M_SN_val3_, M_AGB_val4_);
+                                            
             SNR_val[i_age + 1]  = SNR(i_m_min, i_birth_valt, IMF_val, SFR_val);
 
             // Equ. (4.1) of Nishida D-thesis

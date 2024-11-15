@@ -2,6 +2,7 @@
 
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 import glob
 import astropy.units as u
 import pandas as pd
@@ -20,7 +21,6 @@ def delete_past_data():
             file_path = os.path.join(root, file)
             try:
                 os.remove(file_path)  # ファイルを削除
-                print(f"Deleted: {file_path}")
             except Exception as e:
                 print(f"Error deleting {file_path}: {e}")
 
@@ -68,3 +68,50 @@ def sed_diagram():
     # plt.legend(bbox_to_anchor=(1.05, 1.0),loc='upper left', fontsize=9)
     plt.xlim(0.8e-1,1e3)
     plt.ylim(1e1,1e13)
+
+# TODO: 観測データ表示はデザインの見直しが必要
+def observational_sed_diagram(observational_data):
+    # データの読み込み
+    data = np.loadtxt(observational_data, skiprows=1)
+    t = data[:, 0]
+    y = data[:, 1]
+    error_plus = data[:, 2]
+    error_minus = data[:, 3]
+    upper_limit = data[:, 4].astype(bool)
+
+    # 通常のデータと上限データを分ける
+    t_normal = t[~upper_limit]
+    y_normal = y[~upper_limit]
+    errors_normal = [error_minus[~upper_limit], error_plus[~upper_limit]]
+
+    t_upper = t[upper_limit]
+    y_upper = y[upper_limit]
+
+    # プロットの設定
+    plt.figure(figsize=(10, 6))
+
+    # 通常の観測データをプロット（エラーバー付き）
+    plt.errorbar(t_normal, y_normal, yerr=errors_normal, fmt='o', color='blue', label='Observed Data')
+
+    # 上限データに矢印と水平線を追加
+    plt.scatter(t_upper, y_upper, marker='v', color='red', label='Upper Limit')
+    for i in range(len(t_upper)):
+        # 水平線の追加
+        plt.hlines(y_upper[i], t_upper[i] - 0.1 * t_upper[i], t_upper[i] + 0.1 * t_upper[i], color='red', linestyles='dashed')
+        
+        # 矢印の追加（矢印先端が水平線の下に来るよう調整）
+        plt.arrow(t_upper[i], y_upper[i] * 0.8, 0, -0.3 * y_upper[i], head_width=0.02 * t_upper[i], 
+                  head_length=0.1 * y_upper[i], fc='red', ec='red')
+
+    # グラフの設定
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel('Wavelength [$\mu$m]', fontsize=15)
+    plt.ylabel('$\lambda L_\lambda $[erg s$^{-1}$ $L_\odot^{-1}$]', fontsize=15)
+    plt.title('Observation Data with Upper Limits and Error Bars')
+    plt.legend()
+    plt.grid()
+    plt.xlim(0.2e-1, 1e3)
+    plt.ylim(1e2, 1e13)
+
+    plt.show()

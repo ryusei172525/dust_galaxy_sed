@@ -132,12 +132,23 @@ static constexpr auto MEAN_ATOMIC_WEIGHT = 1.4; //!Mean atomic weigh
 // hydrogen number densities of the CNM and the WNM [cm-3]
 static const auto     INDEX_CNM = 0.7;
 static const auto     INDEX_WNM = 1.0;
-static const auto     n0_CNM    = 1e5; // default: 1e3 1e4 1e5(kano)
+// static const auto     n0_CNM    = 1e5; // default: 1e3 1e4 1e5(kano)
+
+
+
+// extern double n0_cnm_;  // Declare it as an external variable
+// static const auto     n0_CNM    = n0_cnm_; // default: 1e3 1e4 1e5(kano)
+
+
 static const auto     n0_WNM    = 1.0; // default: 1.0
 //![K / cm3]; WIM temperature (Warm ionized medium)
 static const double   T_CNM_MGA = std::pow(10, 4.5);
+
+
 // ~ 37.2 [cm-3] hydrogen density in cold neutral medium (Inoue 2005)
-static const auto     n_CNM     = n0_CNM * std::pow(PKB / T_CNM_MGA, 1.0 / INDEX_CNM);
+// static const auto     n_CNM     = n0_CNM * std::pow(PKB / T_CNM_MGA, 1.0 / INDEX_CNM);
+
+
 //[K / cm3] WIM temperature (Warm ionized medium)f
 static constexpr auto T_WNM_MGA = 1e+4;
 //~0.316 [cm-3] hydrogen density in warm neutral medium
@@ -148,12 +159,24 @@ static constexpr auto n_HOMOGENEOUS = 1.0;
 
 // [g / cm3] Regard WNM as interclump medium
 static const auto RHO_ICM   = MEAN_ATOMIC_WEIGHT * m_PROTON * n_WNM;
+
+
+
 // [g / cm3] Regard CNM as clump
-static const auto RHO_CLUMP = MEAN_ATOMIC_WEIGHT * m_PROTON * n_CNM;
+// static const auto RHO_CLUMP = MEAN_ATOMIC_WEIGHT * m_PROTON * n_CNM;
+
+
+
 
 // volume filling fraction of clumps (~1.85e-2)
 // a + b = 1, a * n_CNM + b * n_WNM = n_HOMOGENEOUS の解
-static const auto FRACTION_CLUMP = (n_HOMOGENEOUS - n_WNM) / (n_CNM - n_WNM);
+
+
+
+// static const auto FRACTION_CLUMP = (n_HOMOGENEOUS - n_WNM) / (n_CNM - n_WNM);
+
+
+
 
 //[cm] Jeans length for a sphere of the CNM
 // static const auto R_CLUMP = std::sqrt(15.0 * k_B * PKB / (4.0 * PI * GRAV)) /
@@ -206,7 +229,7 @@ inline static constexpr auto RHO_CARSIL = std::array<double, 2>{2.2631,
 inline static constexpr auto AGB_DATA_TYPE    = 0; // 0: Zhukovska et al.(2008) 1: Ventura et al.(2012a,b)
 inline static constexpr auto SN_DATA_TYPE     = 0; // 0:SN size distribution data written in Nozawa et al.(2007), 1:the data written in Bianchi & Schneider = 2007)
 inline static constexpr auto DUST_SOURCE_TYPE = 0; // 0:AGB+SNeII, 1:AGB only, 2:SNeII only
-inline static constexpr auto IMF_TYPE         = 2; // 0:Salpeter IMF, 1:Larson IMF, 2:Chabrier IMF, 3:Chabrier_1+x=2, 4:Chabrier_1+x=1.5, 5:Chabrier_1+x=1.1 7:Chabrier_1+x=0.9
+// inline static constexpr auto IMF_TYPE         = 2; // 0:Salpeter IMF, 1:Larson IMF, 2:Chabrier IMF, 3:Chabrier_1+x=2, 4:Chabrier_1+x=1.5, 5:Chabrier_1+x=1.1 7:Chabrier_1+x=0.9
 
 // Used in stellar spectrum (PEGASE)
 inline static constexpr auto isGALACTIC_WIND    = false;

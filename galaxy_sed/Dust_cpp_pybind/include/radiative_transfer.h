@@ -96,8 +96,15 @@ class RadiativeTransfer {
      */
     inline void
     MegaGrainApproximationOneAge(const val& k_val, const val& omega_val,
-                                 const val& g_val) noexcept {
+                                 const val& g_val, double n0_cnm) noexcept {
+        // extern double n0_cnm_;  // Declare it as an external variable
+        const auto     n0_CNM    = n0_cnm; // default: 1e3 1e4 1e5(kano)
         // The optical depth of a clump relative to the interclump medium
+        // [g / cm3] Regard CNM as clump
+        const auto     n_CNM     = n0_CNM * std::pow(PKB / T_CNM_MGA, 1.0 / INDEX_CNM);
+        const auto RHO_CLUMP = MEAN_ATOMIC_WEIGHT * m_PROTON * n_CNM;
+        const auto FRACTION_CLUMP = (n_HOMOGENEOUS - n_WNM) / (n_CNM - n_WNM);
+
         const auto tau_clump_val   = (RHO_CLUMP - RHO_ICM) * k_val * D_ * R_CLUMP;
         std::cout << "Rho_cl = " << RHO_CLUMP << ", Rho_ICM = " << RHO_ICM << ", R_CLUMP = " << R_CLUMP << ", f_cl = " << FRACTION_CLUMP
         << std::endl;
@@ -359,11 +366,11 @@ class RadiativeTransfer {
      * @param g_val Asymmetry parameter
      */
     inline RadiativeTransfer(double D, double dz, val f_young_val, const val& k_val,
-                             const val& omega_val, const val& g_val) noexcept:
+                             const val& omega_val, const val& g_val, double n0_cnm) noexcept:
     D_(D),
     f_young_val_(std::move(f_young_val)),
     mu_val_(MuVal()) {
-        MegaGrainApproximationOneAge(k_val, omega_val, g_val);
+        MegaGrainApproximationOneAge(k_val, omega_val, g_val, n0_cnm);
         tau_val_ = kappa_eff_val_ * dz;
     }
 
