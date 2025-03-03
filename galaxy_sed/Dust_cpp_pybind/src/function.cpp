@@ -41,17 +41,17 @@ namespace asano_model
         auto dM_in_CNM = val2();
         auto dM_in_MC = val2();
         auto dM_in_WNM = val2();
-#pragma omp parallel sections
+        #pragma omp parallel sections
         {
-#pragma omp section
-            dM_in_CNM = evolution_vector[0].Calculation(M_gas, M_X_val, volume_val, m_grain_dm_val2,
-                                                        M_dust_val2);
-#pragma omp section
-            dM_in_MC = evolution_vector[1].Calculation(M_gas, M_X_val, volume_val, m_grain_dm_val2,
-                                                       M_dust_val2);
-#pragma omp section
-            dM_in_WNM = evolution_vector[2].Calculation(M_gas, M_X_val, volume_val, m_grain_dm_val2,
-                                                        M_dust_val2);
+            #pragma omp section
+                        dM_in_CNM = evolution_vector[0].Calculation(M_gas, M_X_val, volume_val, m_grain_dm_val2,
+                                                                    M_dust_val2);
+            #pragma omp section
+                        dM_in_MC = evolution_vector[1].Calculation(M_gas, M_X_val, volume_val, m_grain_dm_val2,
+                                                                M_dust_val2);
+            #pragma omp section
+                        dM_in_WNM = evolution_vector[2].Calculation(M_gas, M_X_val, volume_val, m_grain_dm_val2,
+                                                                M_dust_val2);
         }
         //    for (auto&& evolution : evolution_vector) {
         //        M_evolution_val2 += evolution.Calculation(M_gas, M_X_val, volume_val,//                                                  m_grain_dm_val2, M_dust_val2);

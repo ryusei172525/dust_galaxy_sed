@@ -1,6 +1,6 @@
 /**
  * @file SED_mode.cpp
- * @brief Calculate SED model
+ * @brief SEDモデルを計算する
  */
 
 #include <SED_model.h>
@@ -28,105 +28,101 @@ using DustProperty = dust_property::AveragedDustProperty;
 using Time = my_util::MyTime;
 
 // ハイパーパラメータを格納する構造体
-struct Hyperparameters {
-    int galaxy_age;
-    double galaxy_mass;
-    double starformation_timescale;
-    double gas_infall_timescale;
-    double dust_scale_height;
-    double galaxy_radius;
-    double n0_cnm;
-    bool is_closedbox;
-    int imf_type;
+struct alignas(8) Hyperparameters {
+    int galaxy_age;                // 銀河の年齢 0=100Myr,4=500Myr,9=1Gyr,49=5Gyr,99=10Gyr,129=13Gyr
+    double galaxy_mass;            // 銀河の質量
+    double starformation_timescale; // 星形成のタイムスケール
+    double gas_infall_timescale;   // ガス流入のタイムスケール
+    double dust_scale_height;      // ダストのスケールハイト
+    double galaxy_radius;          // 銀河の半径
+    double n0_cnm;                 // 中性水素の密度
+    bool is_infall;                // 流入モデルかどうか
+    int imf_type;                  // 初期質量関数のタイプ
     // 他のハイパーパラメータを追加
 };
 
-void SED_calculator(Hyperparameters &mcmc_params) {
-    const auto start_time = Time::GetTime();
+// SED計算を行う関数
+void SED_calculator(const std::shared_ptr<Hyperparameters>& mcmc_params) {
+    const auto start_time = Time::GetTime(); // 計算開始時間を記録
 
-    // STEP1. Parameter initialization and calculation of physical constants
-    const auto i_age_valt = valt{mcmc_params.galaxy_age};      // galaxy age,0=100Myr,4=500Myr,9=1Gyr,49=5Gyr,99=10Gyr,129=13Gyr
-    const auto M_gal_val = val{mcmc_params.galaxy_mass * 1e9};   //! Total galaxy mass list [Msun]  default:1.0e11   2e10 2.9e12(kawamoto distant assumption) 3.1e11(kano)　1.7e11(kano)
-    const auto tau_SF_vec = vec{mcmc_params.starformation_timescale * 1e9};     //! Star formation timescale list  [yr] default:3e9  5e8(kawamoto distant assumption) 1e8(kano)
-    const auto tau_infall_vec = vec{mcmc_params.gas_infall_timescale * 1e9}; //! Infall timescale [yr]  default:15e9   1e9(kawamoto distant assumption) 5e8(kano)
-    const auto tau_pair_vec = SED_model::MakePairVector(tau_SF_vec, tau_infall_vec);
+    // STEP0. パラメータの初期化と物理定数の計算
+    const auto i_age_valt = valt{mcmc_params->galaxy_age};      // 銀河の年齢を取得
+    const auto M_gal_val = val{mcmc_params->galaxy_mass * 1e9};   //! 銀河の質量を太陽質量に変換 [Msun] 天の川銀河:1.0e11 [Msun]
+    const auto tau_SF_vec = vec{mcmc_params->starformation_timescale * 1e9};     //! 星形成のタイムスケールリスト [yr] 天の川銀河:3e9[yr]
+    const auto tau_infall_vec = vec{mcmc_params->gas_infall_timescale * 1e9}; //! ガス流入のタイムスケール [yr] 天の川銀河: 15e9[yr]
+    const auto h_dust_vec = vec{mcmc_params->dust_scale_height * PC}; //! ダストのスケールハイト [cm]　天の川銀河: 150pc
+    const auto R_gal_vec = vec{mcmc_params->galaxy_radius * PC}; //! 銀河の半径 [cm] 天の川銀河: 10e3pc
+    const double n0_cnm_ = mcmc_params->n0_cnm; // 中性水素の密度を取得
+    const auto IMF_TYPE = mcmc_params->imf_type; // 初期質量関数のタイプを取得
 
-    const auto h_dust_vec = vec{mcmc_params.dust_scale_height * PC}; //! Dust scale height [cm] default:150PC
-    const auto R_gal_vec = vec{mcmc_params.galaxy_radius * PC}; //! Galaxy radius [cm]    default:10e3PC(10kPC)
-    const auto geometry_pair_vec = SED_model::MakePairVector(h_dust_vec, R_gal_vec);
+    const auto tau_pair_vec = SED_model::MakePairVector(tau_SF_vec, tau_infall_vec); // タイムスケールのペアを作成
+    const auto geometry_pair_vec = SED_model::MakePairVector(h_dust_vec, R_gal_vec); // ジオメトリのペアを作成
 
-    const double n0_cnm_ = mcmc_params.n0_cnm;
+    // フリーパラメータの初期化
+    auto free_params = FreeParameter(); // フリーパラメータのインスタンスを作成
+    free_params.SetIsInfall(mcmc_params->is_infall); // 流入モデルかどうかを設定 false:closed-box model, true:infall model
+    free_params.SetAgeMax((static_cast<double>(i_age_valt.max() + 1)) * TIME_BIN); // 最大年齢を設定
 
-    const auto IMF_TYPE = mcmc_params.imf_type;
+    // ダスト半径リストと波長リストを作成
+    const auto a_cm_val = SEDSetting::DustRadiusCm(); // ダスト半径をセンチメートルで取得
+    const auto lambda_cm_val = SEDSetting::LambdaCm(); // 波長をセンチメートルで取得
 
-    // STEP2. Initialization of free parameters
-    auto free_params = FreeParameter();
-    free_params.SetIsInfall(mcmc_params.is_closedbox); //  false:closed-box model, true:infall model
-    free_params.SetAgeMax((static_cast<double>(i_age_valt.max() + 1)) * TIME_BIN);
+    const auto E_photon_val = cl * h_P / lambda_cm_val; // 光子エネルギーを計算
 
-    // Make dust radius list and wavelength list
-    const auto a_cm_val = SEDSetting::DustRadiusCm();
-    const auto lambda_cm_val = SEDSetting::LambdaCm();
-    const auto E_photon_val = cl * h_P / lambda_cm_val;
-
+    // ダストの種類を定義
     const auto dust_species_vec = std::vector<std::string>{"Sil", "Gra", "PAHneu", "PAHion"};
 
-    //! dust class vector
+    // ダストクラスのベクトルを作成
     auto dust_vec = my_util::dust_util::MakeDustClassVector(dust_species_vec, a_cm_val);
 
-    // STEP3. Initialization of Asano model
-    const auto asano_model = asano_model::AsanoModel();
+    // Asanoモデルの初期化
+    const auto asano_model = asano_model::AsanoModel(); // Asanoモデルのインスタンスを作成
 
-    // STEP4. Read stellar spectrum file
+    // SED構成STEP1. 星のスペクトルファイルを読み込む
     const auto stellar_spectrum = stellar_spectrum::StellarSpectrum(lambda_cm_val);
 
-    // first: tau_SF, second: tau_infall
-    for (const auto &tau_pair : tau_pair_vec)
-    {
-        free_params.SetStarFormationTimescale(tau_pair.first);
-        free_params.SetInfallTimescale(tau_pair.second);
+    // タイムスケールのペアに基づいて計算を行う
+    for (const auto &tau_pair : tau_pair_vec) {
+        free_params.SetStarFormationTimescale(tau_pair.first); // 星形成のタイムスケールを設定
+        free_params.SetInfallTimescale(tau_pair.second); // 流入のタイムスケールを設定
 
-        const auto fn_m_total = TotalDustMassFileName(free_params);
-        const auto fn_m = DustMassDistributionFileName(free_params);
-        const auto fn_n = DustNumberDistributionFileName(free_params);
+        // Asanoモデル計算後のファイルの置き場所指定
+        const auto fn_m_total = TotalDustMassFileName(free_params); // 総ダスト質量ファイル名を取得
+        const auto fn_m = DustMassDistributionFileName(free_params); // ダスト質量分布ファイル名を取得
+        const auto fn_n = DustNumberDistributionFileName(free_params); // ダスト数分布ファイル名を取得
 
-        // STEP5. Calculate dust evolution
-        asano_model.Calculate(free_params, fn_m_total, fn_m, fn_n, IMF_TYPE);
+        // SED構成STEP2. ダストの進化を計算
+        asano_model.Calculate(free_params, fn_m_total, fn_m, fn_n, IMF_TYPE); // ダストの進化を計算
 
-        // used in radiative transfer
-        const auto D_val = SEDFile::ReadDustToGasMassRatio(fn_m_total, free_params.n_age_);
+        // Asano modelの計算結果から放射伝達に使用する値を読み込む
+        const auto D_val = SEDFile::ReadDustToGasMassRatio(fn_m_total, free_params.n_age_); // Asanoモデルで計算したダストとガスの質量比を読み込む
+        const auto M_total_gal_val = SEDFile::ReadTotalGalaxyMassRatio(fn_m_total, free_params.n_age_); // Asanoモデルで計算した銀河の総質量比を読み込む
 
-        const auto M_total_gal_val = SEDFile::ReadTotalGalaxyMassRatio(fn_m_total,
-                                                                       free_params.n_age_);
-
+        // Asano modelの計算結果からダストの種類ごとの数分布を読み込む
         // n_val3[0]: silicate, n_val3[1]: graphite, n_val3[2]: neutral PAH, and n_val3[3]: ionized PAH
-        const auto n_val3 = my_util::dust_util::ReadAndDivideDustNumberDistribution(
-            fn_n, free_params.n_age_, a_cm_val);
+        const auto n_val3 = my_util::dust_util::ReadAndDivideDustNumberDistribution(fn_n, free_params.n_age_, a_cm_val);
 
-        // dust extinction per unit mass, scattering albedo, and asymmetry parameter
-        const auto fn_averaged_params = AveragedDustPropertyFileName(free_params);
-        const auto dust_params_val3 = DustProperty::Calculate(a_cm_val, free_params, n_val3,
-                                                              fn_averaged_params);
+        // ダストの特性を計算 dust extinction per unit mass, scattering albedo, and asymmetry parameter
+        const auto fn_averaged_params = AveragedDustPropertyFileName(free_params); // 平均ダスト特性ファイル名を取得
+        const auto dust_params_val3 = DustProperty::Calculate(a_cm_val, free_params, n_val3, fn_averaged_params); // ダスト特性を計算
 
-        const auto Cabs_sum_val2 = SEDFile::ReadSumAbsorptionCoefficient(fn_averaged_params,
-                                                                         free_params.n_age_);
+        const auto Cabs_sum_val2 = SEDFile::ReadSumAbsorptionCoefficient(fn_averaged_params, free_params.n_age_); // 吸収係数を読み込む
 
-        for (const auto &i_age : i_age_valt)
-        {
-            free_params.SetIndexOfAge(i_age);
+        // 銀河の年齢に基づいて計算を行う
+        for (const auto &i_age : i_age_valt) {
+            free_params.SetIndexOfAge(i_age); // 年齢を設定
 
-            stellar_spectrum.Calculate(free_params);
-            const auto f_young_val = SEDFile::ReadYoungStellarFraction(FYoungFileName(free_params));
-            const auto L_star_val = SEDFile::ReadStellarContinuumFile(
-                StellarContinuumFileName(free_params));
+            stellar_spectrum.Calculate(free_params); // 星のスペクトルを計算
+            const auto f_young_val = SEDFile::ReadYoungStellarFraction(FYoungFileName(free_params)); // 若い星の割合を読み込む
+            const auto L_star_val = SEDFile::ReadStellarContinuumFile(StellarContinuumFileName(free_params)); // 星の連続体フラックスを読み込む
 
-            for (const auto &M_gal : M_gal_val)
-            {
-                free_params.SetTotalGalaxyMass(M_gal);
+            for (const auto &M_gal : M_gal_val) {
+                free_params.SetTotalGalaxyMass(M_gal); // 銀河の質量を設定
 
                 for (auto i = std::size_t(0); i < dust_vec.size(); ++i)
-                    dust_vec[i].SetNumberDistribution(M_gal, n_val3[i]);
+                    dust_vec[i].SetNumberDistribution(M_gal, n_val3[i]); // ダストの数分布を設定
 
+                // 年齢依存のSEDを計算
                 SED_model::AgeDependent(dust_species_vec, M_gal,
                                         lambda_cm_val, a_cm_val, E_photon_val, D_val[i_age],
                                         dust_params_val3[0][i_age],
@@ -137,20 +133,18 @@ void SED_calculator(Hyperparameters &mcmc_params) {
         }
     }
 
-    my_util::MyTime::PrintElapsedTime(start_time, "sec", "Total: ");
+    my_util::MyTime::PrintElapsedTime(start_time, "sec", "Total: "); // 計算にかかった時間を出力
     std::cout << std::endl;
 }
 
-// int main(int argc, char *argv[]) {
-//     SED_calculator(galaxy_age);
-// }
+
 
 // pybind11モジュールの定義
 namespace py = pybind11;
 
 // pybind11でのバインディング
 PYBIND11_MODULE(sed_module, m) {
-    py::class_<Hyperparameters>(m, "Hyperparameters")
+    py::class_<Hyperparameters, std::shared_ptr<Hyperparameters>>(m, "Hyperparameters")
         .def(py::init<>())
         .def_readwrite("galaxy_age", &Hyperparameters::galaxy_age)
         .def_readwrite("galaxy_mass", &Hyperparameters::galaxy_mass)
@@ -159,8 +153,8 @@ PYBIND11_MODULE(sed_module, m) {
         .def_readwrite("dust_scale_height", &Hyperparameters::dust_scale_height)
         .def_readwrite("galaxy_radius", &Hyperparameters::galaxy_radius)
         .def_readwrite("n0_cnm", &Hyperparameters::n0_cnm)
-        .def_readwrite("is_closedbox", &Hyperparameters::is_closedbox)
+        .def_readwrite("is_infall", &Hyperparameters::is_infall)
         .def_readwrite("imf_type", &Hyperparameters::imf_type);
 
-    m.def("SED_calculator", &SED_calculator, "A function that calculates SED based on hyperparameters");
+    m.def("SED_calculator", &SED_calculator, "ハイパーパラメータに基づいてSEDを計算する関数");
 }

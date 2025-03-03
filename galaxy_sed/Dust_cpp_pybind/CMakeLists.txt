@@ -1,4 +1,7 @@
-cmake_minimum_required(VERSION 3.11.4)
+# cmake_minimum_required(VERSION 3.11.4)
+cmake_minimum_required(VERSION 3.13)  # CMakeのバージョンを指定（3.13以降を推奨）
+cmake_policy(SET CMP0079 NEW)  # CMP0079ポリシーを有効化
+
 project(test)
 
 # CMakeのポリシーを設定 (CMP0074を使用する)
@@ -33,3 +36,12 @@ add_subdirectory(main)
 add_subdirectory(src)
 
 find_package(OpenMP REQUIRED)
+# find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(SED_calculator PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
+# デバック用
+set(CMAKE_BUILD_TYPE Debug) # デバッグビルドを有効化
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g")
+

@@ -5,6 +5,7 @@
 #include <cfloat>
 #include <cmath>
 #include <numeric>
+#include <tuple>
 
 #include <constants.h>
 #include <star_formation_history.h>
@@ -861,7 +862,7 @@ namespace asano_model
     {
         const auto m_gas = m_gas_pre +
                            TIME_BIN_DUST_MODEL *
-                               (-SFH::SFR(m_gas_pre, schmidt_index, tau_SF) + m_return);
+                               (-SFH::SFR(m_gas_pre, schmidt_index, tau_SF, static_cast<double>(n) * TIME_BIN_DUST_MODEL) + m_return);
         if (is_infall == false)
             return m_gas;
         else
@@ -871,9 +872,9 @@ namespace asano_model
     }
 
     inline double StellarMass(double M_star_pre, double M_gas, double M_return, double schmidt_index,
-                              double tau_SF) noexcept
+                              double tau_SF, size_t n) noexcept
     {
-        return M_star_pre + TIME_BIN_DUST_MODEL * (SFH::SFR(M_gas, schmidt_index, tau_SF) - M_return);
+        return M_star_pre + TIME_BIN_DUST_MODEL * (SFH::SFR(M_gas, schmidt_index, tau_SF, static_cast<double>(n) * TIME_BIN_DUST_MODEL) - M_return);
     }
 
     // SN によるダストの破壊を計算
@@ -881,49 +882,60 @@ namespace asano_model
     SNDestruction(double M_gas, double M_Z, double SN_rate, const val &a_val, const val2 &M_dust_val2,
                   const val4 &dest_eta_val4) noexcept
     {
+        // ダストの破壊量を格納するための2次元配列を初期化
         auto M_SND_val2 = val2(val(N_DUST_SPECIES), N_MAX_DUST_RADIUS);
+        
+        // 超新星によるダストの破壊が無効な場合、空の配列を返す
         if (isSN_DEST == false)
             return M_SND_val2;
 
+        // 金属量に基づいて破壊効率のインデックスを決定
         auto l = std::size_t(3);
         if (M_Z / M_gas / Zsun < 5.e-3)
-            l = 0;
+            l = 0; // 低金属量
         else if (M_Z / M_gas / Zsun < 5.e-1)
-            l = 1;
+            l = 1; // 中金属量
         else if (M_Z / M_gas / Zsun < 0.5)
-            l = 2;
+            l = 2; // 高金属量
 
+        // 各ダスト種に対してループ
         for (auto i_s = std::size_t(0); i_s < N_DUST_SPECIES - 1; ++i_s)
         {
+            // 各ダスト半径に対してループ
             for (auto i_a = N_RADIUS_MIN; i_a < N_MAX_DUST_RADIUS; ++i_a)
             {
+                // ダストの破壊量を計算するための変数を初期化
                 // dest_etaの配列の左から1番目はダスト種、2番目は、破壊前のダストサイズ、3番目は破壊後のダストサイズ、4番目はmetallicityをそれぞれ表している。
                 // 単純に破壊によって減少している分を計算する際はpre=i_radiusの場合のみなので、for文で計算を回す必要がないはず(24/5/2013)
                 auto dest = 0.0;
                 for (auto pre = N_RADIUS_MIN; pre < N_MAX_DUST_RADIUS; ++pre)
                 {
-                    // calculation of dust decrement for SN shocks (28/5/2103)
+                    // 超新星衝撃によるダストの減少を計算
                     if (i_a != N_MAX_DUST_RADIUS - 1)
                     {
                         if (pre != N_MAX_DUST_RADIUS - 1)
                         {
+                            // 破壊前のダストサイズに基づいて減少量を計算
                             dest += M_dust_val2[pre][i_s] * std::pow(a_val[i_a] / a_val[pre], 3.0) *
                                     dest_eta_val4[l][pre + 1][i_a + 1][i_s + 1];
                         }
                     }
                     else
                     {
+                        // 最大ダスト半径の場合の処理
                         if (pre == N_MAX_DUST_RADIUS - 1)
                         {
                             dest += M_dust_val2[pre][i_s] * std::pow(a_val[i_a] / a_val[pre], 3.0);
                         }
                     }
                 }
+                // 超新星発生率に基づいてダストの破壊量を計算
                 M_SND_val2[i_a][i_s] =
                     (-SN_rate * swept(M_gas, M_Z) / M_gas * (M_dust_val2[i_a][i_s] - dest)) *
                     TIME_BIN_DUST_MODEL;
             }
         }
+        // 計算したダストの破壊量を返す
         return M_SND_val2;
     }
 
@@ -934,20 +946,25 @@ namespace asano_model
 
     inline val2 DustMass(double M_gas, double schmidt_index, double tau_SF, const val2 &M_dust_val2,
                          const val2 &Y_d_val2, const val2 &M_SND_val2,
-                         const val2 &M_evolution_val2) noexcept
+                         const val2 &M_evolution_val2, size_t n) noexcept
     {
+        // ダスト質量の変化量を格納するための2次元配列を初期化
         auto dM_dust_val2 = val2(val(N_DUST_SPECIES), N_MAX_DUST_RADIUS);
 
+        // 各ダスト半径に対してループ
         for (auto i_a = N_RADIUS_MIN; i_a < N_MAX_DUST_RADIUS; ++i_a)
         {
+            // 各ダスト種に対してループ
             for (auto i_s = std::size_t(0); i_s < N_DUST_SPECIES - 1; ++i_s)
             {
-                // -D(t)SFR(t) in Equ.(4.4) of Nishida D-thesis
+                // Nishidaの論文の式(4.4)に基づいて、星化する質量 -D(t)SFR(t) を計算
                 const auto M_astration = -isINJECTION * M_dust_val2[i_a][i_s] / M_gas *
-                                         SFH::SFR(M_gas, schmidt_index, tau_SF);
+                                         SFH::SFR(M_gas, schmidt_index, tau_SF, static_cast<double>(n) * TIME_BIN_DUST_MODEL);
 
+                // ダストの質量を時間に基づいて計算
                 const auto M_dust_by_star = TIME_BIN_DUST_MODEL * (M_astration + Y_d_val2[i_s][i_a]);
 
+                // NaNチェック: ダストの質量がNaNの場合、警告を表示
                 if (std::isnan(M_dust_by_star))
                     std::cout << "i_a = " << i_a << ", i_s = " << i_s << ", M_dust_by_star is nan!!"
                               << std::endl;
@@ -955,15 +972,18 @@ namespace asano_model
                     std::cout << "i_a = " << i_a << ", i_s = " << i_s << ", M_evolution is nan!!"
                               << std::endl;
 
+                // ダストの質量の変化量を計算
                 dM_dust_val2[i_a][i_s] =
                     M_dust_by_star + M_SND_val2[i_a][i_s] + M_evolution_val2[i_a][i_s];
 
+                // ダストの質量が非常に小さい場合、ダストの質量を0に設定
                 if (dM_dust_val2[i_a][i_s] + M_dust_val2[i_a][i_s] < DBL_MIN)
                 {
-                    dM_dust_val2[i_a][i_s] = -M_dust_val2[i_a][i_s]; // Set the total mass to 0
+                    dM_dust_val2[i_a][i_s] = -M_dust_val2[i_a][i_s]; // 総質量を0に設定
                 }
             }
         }
+        // ダストの質量の変化量を現在のダスト質量に加算して返す
         return dM_dust_val2 + M_dust_val2;
     }
 

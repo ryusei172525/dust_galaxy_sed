@@ -328,7 +328,7 @@ MassEvolution(std::size_t n_Z, double max_age, double schmidt_index, bool is_inf
     for (auto age = std::size_t(0); age < static_cast<std::size_t>(max_age / 1e6) + 1; ++age) {
         const auto tua_SF_Myr = tau_SF / 1e6; // convert from yr to Myr
 
-        SFR_val[age] = SFH::SFR(sigma_gas_val[age], schmidt_index, tua_SF_Myr); // Msun/Myr
+        SFR_val[age] = SFH::SFR(sigma_gas_val[age], schmidt_index, tua_SF_Myr, age); // Msun/Myr
 
         const auto[i_Z_age, alpha_age] = WeightZ(n_Z, Z_SFR_val[age], Z_SSP_vec);
         i_Z_val[age]   = i_Z_age;

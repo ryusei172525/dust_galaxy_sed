@@ -275,7 +275,6 @@ class FileUtil {
 
     template<typename CharT, typename Traits>
     inline static std::stringstream GetLineToStringStream(std::basic_istream<CharT, Traits>& is) {
-        //inline static std::stringstream GetLineToStringStream(std::ifstream& is) {
         auto line_string = std::string();
         std::getline(is, line_string);
         return std::stringstream(line_string);
