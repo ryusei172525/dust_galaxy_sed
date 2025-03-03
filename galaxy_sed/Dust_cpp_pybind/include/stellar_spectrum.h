@@ -75,6 +75,7 @@ class StellarSpectrum {
         auto n_SNII_val2 = val2(val(N_MAX_TIME_), n_Z_);
         auto n_SNIa_val2 = val2(val(N_MAX_TIME_), n_Z_);
 
+        // PEGASEで作った星進化トラックdatファイルの読み込み
         ReadStellarFluxFile(fn_track_vec_, F_stellar_LCB_val2, F_stellar_CM_val2, t_SSP_valt,
                             F_bol_SSP_val2, F_SSP_val3, m_alive_val2_, t_inv_val_, beta_val_,
                             n_Lym_val2_, n_SNII_val2, n_SNIa_val2, ejecta_val2_, ejecta_Z_val2_,

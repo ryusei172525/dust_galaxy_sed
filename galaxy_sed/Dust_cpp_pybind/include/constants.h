@@ -234,7 +234,7 @@ inline static constexpr auto DUST_SOURCE_TYPE = 0; // 0:AGB+SNeII, 1:AGB only, 2
 // Used in stellar spectrum (PEGASE)
 inline static constexpr auto isGALACTIC_WIND    = false;
 inline static constexpr auto isNEBULAR_EMISSION = true;
-inline static constexpr auto SFR_TYPE           = 3; // 3: Schmitd low
+inline static constexpr auto SFR_TYPE           = 3; // 3: Schmitd low, 4: Exponentially rising/declining SFR model
 inline static constexpr auto T_WIND             = 200003;
 inline static constexpr auto F_SNIa             = 0.0;
 

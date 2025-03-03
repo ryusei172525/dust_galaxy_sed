@@ -7,6 +7,7 @@
 #include <iostream>
 #include <numeric>
 #include <cfloat>
+#include <mutex>
 
 #include "function.h"
 #include "function.h"
@@ -26,6 +27,22 @@ namespace asano_model
 
     class DustEvolution
     {
+    public:
+    // コピーコンストラクタ
+    DustEvolution(const DustEvolution& other)
+        : ISM_params_(other.ISM_params_),
+          dust_radius_(other.dust_radius_),
+          m_grain_(other.m_grain_),
+          grain_velocity_(other.grain_velocity_),
+          m_bin_max_(other.m_bin_max_),
+          v_ij_(other.v_ij_),
+          M_shocked_(other.M_shocked_),
+          j_val_(other.j_val_),
+          dec_ratio_(other.dec_ratio_),
+          inc_ratio_(other.inc_ratio_),
+          distri_inc_ratio_(other.distri_inc_ratio_) {
+        // std::mutex はコピーしない
+    }
     private:
         ISMParams ISM_params_ = ISMParams("CNM");
         val dust_radius_;
@@ -38,6 +55,7 @@ namespace asano_model
         val4 dec_ratio_;
         val4 inc_ratio_;
         val5 distri_inc_ratio_;
+        mutable std::mutex shattering_mutex; // クラス内で定義
 
         inline double RelativeVelocity(std::size_t omega, double v_i, double v_j) const noexcept
         {
@@ -555,7 +573,8 @@ namespace asano_model
                                const val2 &m_dust_val2, const val2 &m_carsil_val2) const noexcept;
 
         val2 Coagulation(const val2 &m_carsil_val2) const noexcept;
-
+        
+        
         val2 Shattering(const val2 &m_carsil_val2) const noexcept;
 
         val2 DeltaMByGrainGrainCollision(double M_ISM, const val &m_sil_ratio_val,

@@ -40,7 +40,7 @@ async def main():
     result = await MCMCOptimizer.run_mcmc(hyperparams, observational_data, n_walkers, n_dimensions, param_limits)  # 辞書を渡す
 
     print("計算終了")
-    delete_past_data()
+    # delete_past_data()
 
 # イベントループを実行
 if __name__ == "__main__":

@@ -26,11 +26,11 @@ def log_likelihood(theta, observed_wavelength, y, error_plus, error_minus, upper
     
     # GalaxySED インスタンスを作成
     # ユーザが直接指定したパラメータを取りたいときはこれ.paramsの中にデータが入っている
-    # sed_model = GalaxySED(galaxy_age, galaxy_mass, params.starformation_timescale, params.gas_infall_timescale, params.dust_scale_height, params.galaxy_radius, params.n0_cnm, params.is_closedbox, params.imf_type)
+    # sed_model = GalaxySED(galaxy_age, galaxy_mass, params.starformation_timescale, params.gas_infall_timescale, params.dust_scale_height, params.galaxy_radius, params.n0_cnm, params.is_infall, params.imf_type)
     
     # TODO: ユーザーから見てMCMCでもハイパーパラメータでも変数を指定できるようにしたい。現状はプログラム内で最初から決めている。
     # MCMCでパラメータをふったとき
-    sed_model = GalaxySED(galaxy_age, galaxy_mass, starformation_timescale, gas_infall_timescale, params.dust_scale_height, params.galaxy_radius, n0_cnm, params.is_closedbox, params.imf_type)
+    sed_model = GalaxySED(galaxy_age, galaxy_mass, starformation_timescale, gas_infall_timescale, params.dust_scale_height, params.galaxy_radius, n0_cnm, params.is_infall, params.imf_type)
 
 
     # SEDを計算する。計算結果はcalculation_resultに入る
@@ -84,15 +84,19 @@ def log_likelihood(theta, observed_wavelength, y, error_plus, error_minus, upper
     for obs_wl in observed_wavelength:
         # Wavelength列（1列目）をcm単位からum単位に変換し、観測波長に最も近いインデックスを探す
         wl_column_um = calculation_result[:, 0] * 1e4  # cm to μm変換
+        print("observed wavelength: ", obs_wl)
         closest_idx = np.abs(wl_column_um - obs_wl).argmin()
+        print("closest_idx: ", closest_idx)
         
         # 対応するフラックス値（2列目）を取得してy_modelに追加
         y_model.append(calculation_result[closest_idx, 1])
 
     y_model = np.array(y_model)
+    print("y_model: ", y_model)
     
     # 残差の計算
     residuals = y - y_model
+    print("残差: ", residuals)
     
     # 非対称エラーバーを使用
     errors = np.where(residuals >= 0, error_minus, error_plus)
@@ -103,6 +107,7 @@ def log_likelihood(theta, observed_wavelength, y, error_plus, error_minus, upper
         -0.5 * ((y_model - y) / error_plus) ** 2,  # 上限データ（観測値以下に制限）
         -0.5 * (residuals / errors) ** 2 - np.log(np.sqrt(2 * np.pi) * errors)  # 通常データ
     )
+    print("尤度: ", log_likelihood_values)
     
     return np.sum(log_likelihood_values)
 
@@ -146,7 +151,7 @@ class MCMCOptimizer:
         # dust_scale_height = params.dust_scale_height
         # galaxy_radius = params.galaxy_radius
         # n0_cnm = params.n0_cnm
-        # is_closedbox = params.is_closedbox
+        # is_infall = params.is_infall
         # imf_type = params.imf_type
 
         if params.galaxy_age is None or params.galaxy_mass is None:
@@ -182,7 +187,7 @@ class MCMCOptimizer:
         # initial_positions[:, 2] = np.random.uniform(param_limits["sigma_min"], param_limits["sigma_max"], n_walkers)
         # print("initial_positions",initial_positions)
 
-        # MCMCの実行（非並列）
+        # MCMCの実行（並列)
         print("MCMCの実行")
         # プロセスプールを作成
         # with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
@@ -205,14 +210,14 @@ class MCMCOptimizer:
         #                 print(f"Step {step}: mean={mean_values}, std={std_values}")
         
         
-
+        # 非並列処理
         sampler = emcee.EnsembleSampler(n_walkers, n_dimensions, log_probability, args=(observed_wavelength, y_data, error_plus, error_minus, upper_limit, params, param_limits))
         # sampler.run_mcmc(initial_positions, 5000, progress=True)
         
         n_steps = 5000
         for step, result in enumerate(sampler.sample(initial_positions, iterations=n_steps, progress=True)):
-            if step % 100 == 0:  # 100ステップごとに収束状況を表示
-                samples = sampler.get_chain(flat=True, discard=step)
+            if step % 2 == 0:  # 100ステップごとに収束状況を表示
+                samples = sampler.get_chain(flat=True)
                 if len(samples) > 0:
                     mean_values = np.mean(samples, axis=0)
                     std_values = np.std(samples, axis=0)
@@ -250,7 +255,7 @@ class MCMCOptimizer:
         print(f"Estimated sigma: {sigma_estimate}")
         
         # # GalaxySED インスタンスを作成
-        # sed_model = GalaxySED(galaxy_age, galaxy_mass, starformation_timescale, gas_infall_timescale, dust_scale_height, galaxy_radius, n0_cnm, is_closedbox, imf_type)
+        # sed_model = GalaxySED(galaxy_age, galaxy_mass, starformation_timescale, gas_infall_timescale, dust_scale_height, galaxy_radius, n0_cnm, is_infall, imf_type)
         # sed_model.calculate_sed()
         
         """MCMCの代わりに簡単な最適化を実行（例えば、パラメータの平均を返す）"""

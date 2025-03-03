@@ -5,6 +5,7 @@
 #include "read_file.h"
 
 namespace asano_model {
+    
 val2 DustEvolution::Accretion(const val& M_X, const val& M_dust_X, double M_ISM,
                               const val2& rho_val2) const noexcept {
     auto drho_val2 = val2(val(N_MAX_DUST_RADIUS), 2);
@@ -106,9 +107,14 @@ val2 DustEvolution::Coagulation(const val2& m_carsil_val2) const noexcept {
     return dm_carsil_val2;
 }
 
+// メンバ変数アクセス箇所にロック（std::mutex）を追加し、競合を防止する。
+// mutable std::mutex shattering_mutex;
 
+// std::mutex shattering_mutex;
 // もっとも計算に時間がかかるため、メンバ変数を多用して計算を軽くしている
 val2 DustEvolution::Shattering(const val2& m_carsil_val2) const noexcept {
+    std::lock_guard<std::mutex> lock(shattering_mutex); // 排他制御を開始
+
 
     if (ISM_params_.isShat_ == 0) return val2(val(N_MAX_DUST_RADIUS), 2);
     // shattering が発生する相対速度の閾値
@@ -179,16 +185,38 @@ val2 DustEvolution::Calculation(double M_ISM, const val& M_X_val, const val& vol
     const auto m_sil_ratio_val   = SilicateMassDistribution(m_dust_val2);
     auto       dm_acc_val2       = val2();
     auto       dm_collision_val2 = val2();
-    #pragma omp parallel sections
-        {
-    #pragma omp section
-    dm_acc_val2 = DeltaMByAccretion(M_ISM, M_X_val, volume, m_sil_ratio_val,
-                                        m_grain_dm_val2, m_dust_val2, m_carsil_val2);
-    #pragma omp section
-    dm_collision_val2 = DeltaMByGrainGrainCollision(M_ISM, m_sil_ratio_val,
-	                                              m_carsil_val2);
+    // #pragma omp parallel sections
+    //     {
+    // #pragma omp section
+    // dm_acc_val2 = DeltaMByAccretion(M_ISM, M_X_val, volume, m_sil_ratio_val,
+    //                                     m_grain_dm_val2, m_dust_val2, m_carsil_val2);
+    // #pragma omp section
+    // dm_collision_val2 = DeltaMByGrainGrainCollision(M_ISM, m_sil_ratio_val,
+	//                                               m_carsil_val2);
 
+    // }
+
+    // インスタンスをスレッドごとに分離
+    // 各スレッドが DustEvolution の別々のインスタンスを使用するようにする。
+    #pragma omp parallel sections
+    {
+        #pragma omp section
+        {
+            // DustEvolution dust_evolution_instance1 = *this; // スレッド専用のインスタンス
+            DustEvolution dust_evolution_instance1(*this); // コピーコンストラクタを使用
+            dm_acc_val2 = dust_evolution_instance1.DeltaMByAccretion(M_ISM, M_X_val, volume, m_sil_ratio_val,
+                                                                    m_grain_dm_val2, m_dust_val2, m_carsil_val2);
+        }
+        #pragma omp section
+        {
+            // DustEvolution dust_evolution_instance2 = *this; // スレッド専用のインスタンス
+            DustEvolution dust_evolution_instance2(*this); // コピーコンストラクタを使用
+            dm_collision_val2 = dust_evolution_instance2.DeltaMByGrainGrainCollision(M_ISM, m_sil_ratio_val,
+                                                                                    m_carsil_val2);
+        }
     }
+    // これにより、メンバ変数が各スレッドで独立するため競合が解消されます。
+
     // ISM ごとの fraction をかけてから戻す
    return val(ISM_params_.f_, N_MAX_DUST_RADIUS) * (dm_acc_val2 + dm_collision_val2);
 }
